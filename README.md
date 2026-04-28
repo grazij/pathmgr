@@ -49,6 +49,14 @@ Custom prefix:
 make install PREFIX="$HOME/.local"
 ```
 
+Uninstall (mirrors the prefix you installed with):
+
+```sh
+sudo make uninstall
+# or, for a custom prefix:
+make uninstall PREFIX="$HOME/.local"
+```
+
 On macOS, `make` produces a universal (fat) binary containing both `arm64` and
 `x86_64` slices. Verify with:
 
@@ -276,6 +284,8 @@ make lint      # syntax-only check
 make test      # run smoke tests in tests/run.sh
 make clean     # remove build artifacts
 make release   # -O3 build
+make install   # install to $(PREFIX)/bin (default /usr/local)
+make uninstall # remove the installed binary and man page
 ```
 
 The implementation is a single C99 source file (`pathmgr.c`) with no

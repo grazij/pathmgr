@@ -13,7 +13,7 @@ else
 	ARCH_FLAGS =
 endif
 
-.PHONY: all build test clean install run lint release man
+.PHONY: all build test clean install uninstall run lint release man
 
 all: build
 
@@ -38,6 +38,10 @@ install: build
 		install -d $(DESTDIR)$(PREFIX)/share/man/man1; \
 		install -m 0644 $(BINARY).1 $(DESTDIR)$(PREFIX)/share/man/man1/$(BINARY).1; \
 	fi
+
+uninstall:
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(BINARY)
+	rm -f $(DESTDIR)$(PREFIX)/share/man/man1/$(BINARY).1
 
 # Regenerate the man page from the binary's --help / --version output.
 # Requires `help2man` (brew install help2man / apt install help2man).
