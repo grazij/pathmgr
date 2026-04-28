@@ -31,7 +31,7 @@ A Homebrew formula is in [`Formula/pathmgr.rb`](Formula/pathmgr.rb). Once
 published to a tap (instructions inside the formula):
 
 ```sh
-brew install <user>/pathmgr/pathmgr
+brew install grazij/pathmgr/pathmgr
 ```
 
 ### From source

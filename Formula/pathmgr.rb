@@ -6,11 +6,11 @@
 #   3. Either:
 #        a. Drop this file into a personal tap repo (e.g.
 #           `homebrew-pathmgr/Formula/pathmgr.rb`), then
-#           `brew install <user>/pathmgr/pathmgr`, or
+#           `brew install grazij/pathmgr/pathmgr`, or
 #        b. Submit to homebrew-core as a new formula PR.
 #
 # To compute SHA256 for the release tarball:
-#   curl -sL https://github.com/<user>/pathmgr/archive/refs/tags/v0.1.0.tar.gz | shasum -a 256
+#   curl -sL https://github.com/grazij/pathmgr/archive/refs/tags/v0.1.0.tar.gz | shasum -a 256
 #
 # To install locally for testing without a tap:
 #   brew install --build-from-source ./Formula/pathmgr.rb
