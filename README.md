@@ -6,18 +6,19 @@ fragments pile up across rc files.
 
 ## Why
 
-On macOS, `/etc/zprofile` runs `/usr/libexec/path_helper` **before**
-`~/.zshenv`. `path_helper` reads `/etc/paths` and `/etc/paths.d/*` and
-**rewrites `PATH` from scratch** — putting Apple's system entries first
-and any tooling you care about (Homebrew, Cargo, language version
-managers) after them. Half the entries it pins in front are also empty
-or near-empty (e.g. several `/var/run/.../codex.system/...` dirs and
+On macOS, `/etc/profile` (and its zsh equivalent `/etc/zprofile`) runs
+`/usr/libexec/path_helper` **before** `~/.zshenv` and `~/.zprofile`.
+`path_helper` reads `/etc/paths` and `/etc/paths.d/*` and **rewrites
+`PATH` from scratch** — putting Apple's system entries first and any
+tooling you care about (Homebrew, Cargo, language version managers)
+after them. Half the entries it pins in front are also empty or
+near-empty (e.g. several `/var/run/.../codex.system/...` dirs and
 `/Library/Apple/usr/bin`).
 
 It's worse for non-shell contexts. The macOS Shortcuts app's "Run Shell
 Script" action only loads `~/.zshenv` (no profile, no rc) — and since
-`path_helper` already ran in `/etc/zprofile`, the `PATH` Shortcuts sees
-is whatever `path_helper` produced unless you overwrite it in
+`path_helper` already ran via the system profile, the `PATH` Shortcuts
+sees is whatever `path_helper` produced unless you overwrite it in
 `~/.zshenv`.
 
 `pathset` fixes both: declare the order you want once in
