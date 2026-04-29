@@ -3,14 +3,14 @@ set -u
 
 # Resolve repo root and binary
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$DIR/pathmgr"
+BIN="$DIR/pathset"
 
 if [[ ! -x "$BIN" ]]; then
 	echo "tests: $BIN not found or not executable; run 'make build' first" >&2
 	exit 1
 fi
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/pathmgr-tests.XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/pathset-tests.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
 pass=0
@@ -83,22 +83,22 @@ fi
 
 # --- Test 5: XDG_CONFIG_HOME fallback (no -c) ---
 xdg="$WORK/xdg"
-mkdir -p "$xdg/pathmgr"
-echo "$A" >"$xdg/pathmgr/config"
+mkdir -p "$xdg/pathset"
+echo "$A" >"$xdg/pathset/config"
 got5="$(env -i HOME="$WORK/home" XDG_CONFIG_HOME="$xdg" "$BIN" 2>/dev/null)"
 if [[ "$got5" == "$A" ]]; then
-	ok "XDG_CONFIG_HOME/pathmgr/config fallback"
+	ok "XDG_CONFIG_HOME/pathset/config fallback"
 else
 	bad "XDG fallback" "got: $got5"
 fi
 
 # --- Test 6: HOME fallback when XDG_CONFIG_HOME unset ---
 home="$WORK/home"
-mkdir -p "$home/.pathmgr"
-echo "$B" >"$home/.pathmgr/config"
+mkdir -p "$home/.pathset"
+echo "$B" >"$home/.pathset/config"
 got6="$(env -i HOME="$home" "$BIN" 2>/dev/null)"
 if [[ "$got6" == "$B" ]]; then
-	ok "HOME/.pathmgr/config fallback"
+	ok "HOME/.pathset/config fallback"
 else
 	bad "HOME fallback" "got: $got6"
 fi
@@ -305,10 +305,10 @@ fi
 cfg23="$WORK/cfg23"
 cat >"$cfg23" <<EOF
 $A
-\$PATHMGR_DEFINITELY_UNSET_XYZ/bin
+\$PATHSET_DEFINITELY_UNSET_XYZ/bin
 EOF
-got23="$(unset PATHMGR_DEFINITELY_UNSET_XYZ; "$BIN" -c "$cfg23" 2>"$WORK/err23")"
-if [[ "$got23" == "$A" ]] && grep -q "PATHMGR_DEFINITELY_UNSET_XYZ is not set" "$WORK/err23"; then
+got23="$(unset PATHSET_DEFINITELY_UNSET_XYZ; "$BIN" -c "$cfg23" 2>"$WORK/err23")"
+if [[ "$got23" == "$A" ]] && grep -q "PATHSET_DEFINITELY_UNSET_XYZ is not set" "$WORK/err23"; then
 	ok "unset \$VAR is skipped with warning"
 else
 	bad "unset var" "got: $got23 / err: $(cat "$WORK/err23")"
@@ -318,7 +318,7 @@ fi
 cfg24="$WORK/cfg24"
 cat >"$cfg24" <<EOF
 $A
-~pathmgr_no_such_user_xyz/bin
+~pathset_no_such_user_xyz/bin
 EOF
 got24="$("$BIN" -c "$cfg24" 2>"$WORK/err24")"
 if [[ "$got24" == "$A" ]] && grep -q "unknown user" "$WORK/err24"; then
@@ -405,9 +405,9 @@ fi
 cfg33="$WORK/cfg33"
 cat >"$cfg33" <<EOF
 $A
-\$PATHMGR_NOPE_X/bin
+\$PATHSET_NOPE_X/bin
 EOF
-unset PATHMGR_NOPE_X 2>/dev/null
+unset PATHSET_NOPE_X 2>/dev/null
 "$BIN" -c "$cfg33" >/dev/null 2>/dev/null
 rc=$?
 if [[ $rc -eq 3 ]]; then
@@ -475,8 +475,8 @@ fi
 # --- Test 39: -V prints version and exits 0 ---
 got39="$("$BIN" -V 2>/dev/null)"
 rc=$?
-if [[ $rc -eq 0 ]] && [[ "$got39" =~ ^pathmgr\ [0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-	ok "-V prints version (matches 'pathmgr X.Y.Z')"
+if [[ $rc -eq 0 ]] && [[ "$got39" =~ ^pathset\ [0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+	ok "-V prints version (matches 'pathset X.Y.Z')"
 else
 	bad "-V" "rc=$rc / got: $got39"
 fi
@@ -507,9 +507,9 @@ fi
 cfg40="$WORK/cfg40"
 cat >"$cfg40" <<EOF
 $A
-?\$PATHMGR_DEFINITELY_UNSET_OPT/bin
+?\$PATHSET_DEFINITELY_UNSET_OPT/bin
 EOF
-got40="$(unset PATHMGR_DEFINITELY_UNSET_OPT; "$BIN" -c "$cfg40" 2>"$WORK/err40")"
+got40="$(unset PATHSET_DEFINITELY_UNSET_OPT; "$BIN" -c "$cfg40" 2>"$WORK/err40")"
 rc=$?
 if [[ "$got40" == "$A" ]] && [[ ! -s "$WORK/err40" ]] && [[ $rc -eq 0 ]]; then
 	ok "?optional with unset var is silent (exit 0)"
@@ -566,29 +566,29 @@ fi
 # Restore perms so subsequent tests / rm -rf work.
 chmod 755 "$noperm"
 
-# --- Test 44: $HOME/.pathmgr (single-file) fallback ---
+# --- Test 44: $HOME/.pathset (single-file) fallback ---
 home44="$WORK/home44"
 mkdir -p "$home44"
-echo "$A" >"$home44/.pathmgr"
+echo "$A" >"$home44/.pathset"
 got44="$(env -i HOME="$home44" "$BIN" 2>/dev/null)"
 if [[ "$got44" == "$A" ]]; then
-	ok "\$HOME/.pathmgr (single-file) fallback"
+	ok "\$HOME/.pathset (single-file) fallback"
 else
 	bad "single-file fallback" "got: $got44"
 fi
 
-# --- Test 45: $HOME/.pathmgr/config takes precedence over $HOME/.pathmgr ---
+# --- Test 45: $HOME/.pathset/config takes precedence over $HOME/.pathset ---
 home45="$WORK/home45"
-mkdir -p "$home45/.pathmgr"
-echo "$A" >"$home45/.pathmgr/config"
-# A real ~/.pathmgr can't be both file and dir, but the parent path
-# `$home45/.pathmgr` IS the dir here. To prove dir-form wins, we use a
+mkdir -p "$home45/.pathset"
+echo "$A" >"$home45/.pathset/config"
+# A real ~/.pathset can't be both file and dir, but the parent path
+# `$home45/.pathset` IS the dir here. To prove dir-form wins, we use a
 # separate dir layout where the file would conflict; instead, simulate
 # precedence by checking that when both are reachable as separate paths,
 # the dir-form is selected.
 got45="$(env -i HOME="$home45" "$BIN" 2>/dev/null)"
 if [[ "$got45" == "$A" ]]; then
-	ok "\$HOME/.pathmgr/config preferred when present"
+	ok "\$HOME/.pathset/config preferred when present"
 else
 	bad "config-dir precedence" "got: $got45"
 fi
@@ -598,31 +598,31 @@ home46="$WORK/home46"
 mkdir -p "$home46"
 env -i HOME="$home46" "$BIN" >/dev/null 2>"$WORK/err46"
 rc=$?
-if [[ $rc -ne 0 ]] && grep -q "$home46/.config/pathmgr/config" "$WORK/err46"; then
+if [[ $rc -ne 0 ]] && grep -q "$home46/.config/pathset/config" "$WORK/err46"; then
 	ok "missing config error names canonical XDG-default path"
 else
 	bad "missing canonical err" "rc=$rc / err: $(cat "$WORK/err46")"
 fi
 
-# --- Test 47: $HOME/.config/pathmgr/config (XDG default) found ---
+# --- Test 47: $HOME/.config/pathset/config (XDG default) found ---
 home47="$WORK/home47"
-mkdir -p "$home47/.config/pathmgr"
-echo "$A" >"$home47/.config/pathmgr/config"
+mkdir -p "$home47/.config/pathset"
+echo "$A" >"$home47/.config/pathset/config"
 got47="$(env -i HOME="$home47" "$BIN" 2>/dev/null)"
 if [[ "$got47" == "$A" ]]; then
-	ok "\$HOME/.config/pathmgr/config (XDG default) found"
+	ok "\$HOME/.config/pathset/config (XDG default) found"
 else
 	bad "XDG default" "got: $got47"
 fi
 
-# --- Test 48: XDG default precedes legacy ~/.pathmgr/config ---
+# --- Test 48: XDG default precedes legacy ~/.pathset/config ---
 home48="$WORK/home48"
-mkdir -p "$home48/.config/pathmgr" "$home48/.pathmgr"
-echo "$A" >"$home48/.config/pathmgr/config"
-echo "$B" >"$home48/.pathmgr/config"
+mkdir -p "$home48/.config/pathset" "$home48/.pathset"
+echo "$A" >"$home48/.config/pathset/config"
+echo "$B" >"$home48/.pathset/config"
 got48="$(env -i HOME="$home48" "$BIN" 2>/dev/null)"
 if [[ "$got48" == "$A" ]]; then
-	ok "XDG default precedes legacy ~/.pathmgr/config"
+	ok "XDG default precedes legacy ~/.pathset/config"
 else
 	bad "XDG precedence over legacy" "got: $got48"
 fi

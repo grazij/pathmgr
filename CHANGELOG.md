@@ -4,6 +4,67 @@ All notable changes to this project are documented here. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## 0.2.0
+
+### Changed (breaking)
+
+- Renamed the project from `pathmgr` to `pathset`. The binary, source
+  file (`pathset.c`), man page (`pathset.1`), and Homebrew formula are
+  all renamed in lockstep.
+- Config lookup paths are renamed accordingly. New locations (first
+  match wins):
+  1. `-c CONFIG`
+  2. `$XDG_CONFIG_HOME/pathset/config`
+  3. `$HOME/.config/pathset/config` (canonical)
+  4. `$HOME/.pathset/config`
+  5. `$HOME/.pathset`
+- No fallback to old `pathmgr` paths is provided. Users on 0.1.0 must
+  move their config: `mv ~/.config/pathmgr ~/.config/pathset` (or the
+  equivalent for whichever location they used).
+- The `-V` output now prints `pathset X.Y.Z` instead of `pathmgr X.Y.Z`.
+- The default `make` / `make build` / `make release` build is now a
+  **native single-arch** binary (was: macOS universal). Source-based
+  installers like Homebrew compile on the user's host and don't benefit
+  from a fat binary. Pass `make universal` or `make release-universal`
+  to opt in to a fat binary for prebuilt-distribution artifacts.
+- The GitHub repository was renamed from `grazij/pathmgr` to
+  `grazij/pathset`. GitHub redirects from the old name continue to work
+  for clones, but published Homebrew formula URLs now point at the new
+  repo.
+
+### Added
+
+- `make universal` and `make release-universal` targets — explicit
+  opt-in fat (`-arch arm64 -arch x86_64`) builds on macOS.
+- `make release` and `make release-universal` now also run `make test`
+  and `make man`, then print `./pathset -V` and a tag-and-push reminder.
+  The full release artifact is verified before you tag.
+- `make formula VERSION=X.Y.Z` — fetches the tagged tarball from
+  GitHub, computes its SHA256, rewrites `Formula/pathset.rb` (`url` and
+  `sha256` lines), commits + pushes to this repo, then mirrors the
+  formula to `$TAP_DIR` (default `../homebrew-tap`) and commits +
+  pushes there. Override `TAP_DIR`, `GITHUB_USER`, `GITHUB_REPO` if
+  your layout differs.
+- `make formula-verify` — first-time / sanity-check `brew tap` +
+  `install` + `pathset -V` + `uninstall` round-trip against the
+  published tap.
+
+### Documentation
+
+- README now explains *why* `pathset` exists: macOS `/etc/zprofile`
+  runs `/usr/libexec/path_helper` before `~/.zshenv`, which rewrites
+  `PATH` from `/etc/paths` and `/etc/paths.d/*` and pins Apple's
+  (often empty) directories first. The Shortcuts app's "Run Shell
+  Script" only loads `~/.zshenv`, so without an override it inherits
+  whatever `path_helper` produced.
+- The recommended shell-rc invocation is now `pathset -q -d` (was
+  `pathset -q`). Deduplication is appropriate for the PATH-setting use
+  case and avoids accidental duplicates when composing with `$PATH`.
+  Updated in README, examples/config.example, `-h` help text, and the
+  regenerated man page.
+
 ## 0.1.0 — initial release
 
 `pathmgr` is a single-file C99 utility (no dependencies beyond libc) that

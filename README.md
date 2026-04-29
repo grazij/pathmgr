@@ -1,8 +1,29 @@
-# pathmgr
+# pathset
 
 A tiny C utility that turns a human-readable list of directories into a
-`PATH` value. Keep your shell `PATH` managed in one config file instead of
-accreting fragments across rc files.
+`PATH` value. Keep your shell `PATH` in one config file instead of letting
+fragments pile up across rc files.
+
+## Why
+
+On macOS, `/etc/zprofile` runs `/usr/libexec/path_helper` **before**
+`~/.zshenv`. `path_helper` reads `/etc/paths` and `/etc/paths.d/*` and
+**rewrites `PATH` from scratch** — putting Apple's system entries first
+and any tooling you care about (Homebrew, Cargo, language version
+managers) after them. Half the entries it pins in front are also empty
+or near-empty (e.g. several `/var/run/.../codex.system/...` dirs and
+`/Library/Apple/usr/bin`).
+
+It's worse for non-shell contexts. The macOS Shortcuts app's "Run Shell
+Script" action only loads `~/.zshenv` (no profile, no rc) — and since
+`path_helper` already ran in `/etc/zprofile`, the `PATH` Shortcuts sees
+is whatever `path_helper` produced unless you overwrite it in
+`~/.zshenv`.
+
+`pathset` fixes both: declare the order you want once in
+`~/.config/pathset/config`, set `PATH="$(pathset -q -d)"` in `~/.zshenv`,
+and that's the order you actually get — in shells *and* in Shortcuts.
+Empty / non-existent dirs are dropped so the final value stays clean.
 
 ## Quickstart
 
@@ -11,27 +32,27 @@ accreting fragments across rc files.
 make && sudo make install
 
 # 2. Write a config — copy the example and edit
-mkdir -p ~/.config/pathmgr
-cp examples/config.example ~/.config/pathmgr/config
-$EDITOR ~/.config/pathmgr/config
+mkdir -p ~/.config/pathset
+cp examples/config.example ~/.config/pathset/config
+$EDITOR ~/.config/pathset/config
 
 # 3. Add to ~/.zshrc (or ~/.bashrc / ~/.profile)
-export PATH="$(pathmgr -q)"
+export PATH="$(pathset -q -d)"
 ```
 
 That's it. New shells will pick up the managed PATH. Edit
-`~/.config/pathmgr/config` whenever you want to add or remove an entry;
+`~/.config/pathset/config` whenever you want to add or remove an entry;
 the next shell startup applies the change.
 
 ## Installation
 
 ### Homebrew
 
-A Homebrew formula is in [`Formula/pathmgr.rb`](Formula/pathmgr.rb). Once
+A Homebrew formula is in [`Formula/pathset.rb`](Formula/pathset.rb). Once
 published to a tap (instructions inside the formula):
 
 ```sh
-brew install grazij/pathmgr/pathmgr
+brew install grazij/pathset/pathset
 ```
 
 ### From source
@@ -57,11 +78,13 @@ sudo make uninstall
 make uninstall PREFIX="$HOME/.local"
 ```
 
-On macOS, `make` produces a universal (fat) binary containing both `arm64` and
-`x86_64` slices. Verify with:
+By default `make` produces a native single-arch binary. Pass
+`make universal` (or `make release-universal` for an optimized build) to
+produce a macOS fat binary containing both `arm64` and `x86_64` slices —
+useful when packaging a prebuilt release artifact. Verify with:
 
 ```sh
-lipo -info pathmgr
+lipo -info pathset
 ```
 
 ## Migrating from your current PATH
@@ -70,28 +93,28 @@ If you already have a `PATH` you're happy with and just want to take it
 under management, seed your config from the live value:
 
 ```sh
-mkdir -p ~/.config/pathmgr
-echo "$PATH" | tr ':' '\n' > ~/.config/pathmgr/config
+mkdir -p ~/.config/pathset
+echo "$PATH" | tr ':' '\n' > ~/.config/pathset/config
 ```
 
-Then open `~/.config/pathmgr/config` in your editor and clean it up:
+Then open `~/.config/pathset/config` in your editor and clean it up:
 
 1. **Add comments** with `#` to group related entries (e.g. `# homebrew`,
    `# language toolchains`, `# system`). Future-you will thank you.
 2. **Replace hardcoded home paths** like `/Users/me/...` with `~/...` or
    `$HOME/...` so the config is portable across machines.
-3. **Drop dead entries** — `pathmgr` will skip non-existent and empty
+3. **Drop dead entries** — `pathset` will skip non-existent and empty
    directories with warnings, but it's cleaner to remove the noise from
-   the config itself. Run `pathmgr -v` to see which entries are surviving.
+   the config itself. Run `pathset -v` to see which entries are surviving.
 4. **Resolve duplicates** — pass `-d` once to confirm what would be
-   removed (`pathmgr -d -v`), then either edit the duplicates out of the
+   removed (`pathset -d -v`), then either edit the duplicates out of the
    config or leave `-d` in your shell rc.
 
 Replace your existing `PATH=...` line in `~/.zshrc` (or wherever you set
 it) with:
 
 ```sh
-export PATH="$(pathmgr -q)"
+export PATH="$(pathset -q -d)"
 ```
 
 Open a new shell and verify:
@@ -107,13 +130,13 @@ work.
 
 ## Configuration
 
-`pathmgr` reads a plain-text file with one directory per line. Lines whose
+`pathset` reads a plain-text file with one directory per line. Lines whose
 first non-whitespace character is `#` are treated as comments. Blank lines are
 ignored.
 
 A starter config is in
 [`examples/config.example`](examples/config.example) — copy it to
-`~/.config/pathmgr/config` and edit. Excerpt:
+`~/.config/pathset/config` and edit. Excerpt:
 
 ```
 ~/bin
@@ -161,7 +184,7 @@ looking.
 
 ### Variable and tilde expansion
 
-Path entries are expanded by `pathmgr` before being emitted, so the value
+Path entries are expanded by `pathset` before being emitted, so the value
 that ends up in `PATH` is fully resolved. Supported forms:
 
 | Syntax | Meaning |
@@ -202,13 +225,13 @@ if you hit one):
 
 ### Config lookup order
 
-`pathmgr` resolves the config path in this order — **first match wins**:
+`pathset` resolves the config path in this order — **first match wins**:
 
 1. `-c CONFIG` on the command line (no fallback if missing — fatal error)
-2. `$XDG_CONFIG_HOME/pathmgr/config` (only if `XDG_CONFIG_HOME` is set)
-3. `$HOME/.config/pathmgr/config` (XDG default — **canonical**)
-4. `$HOME/.pathmgr/config` (legacy home location)
-5. `$HOME/.pathmgr` (single-file fallback for users who prefer a dotfile)
+2. `$XDG_CONFIG_HOME/pathset/config` (only if `XDG_CONFIG_HOME` is set)
+3. `$HOME/.config/pathset/config` (XDG default — **canonical**)
+4. `$HOME/.pathset/config` (legacy home location)
+5. `$HOME/.pathset` (single-file fallback for users who prefer a dotfile)
 
 Steps 3-5 use `access(F_OK)` to decide which exists. If none do, the
 error message points at the canonical step-3 path.
@@ -216,7 +239,7 @@ error message points at the canonical step-3 path.
 ## Usage
 
 ```
-pathmgr [-c CONFIG] [-d] [-q] [-v] [-V] [-h]
+pathset [-c CONFIG] [-d] [-q] [-v] [-V] [-h]
 ```
 
 Pass `-V` to print the version and exit.
@@ -246,49 +269,51 @@ Note: dropping duplicates with `-d` is not a skip — exit code stays `0`.
 Drop into your shell rc (e.g. `~/.zshrc`):
 
 ```sh
-export PATH="$(pathmgr -q)"
+export PATH="$(pathset -q -d)"
 ```
 
 Or compose with the existing PATH:
 
 ```sh
-export PATH="$(pathmgr -q):$PATH"
+export PATH="$(pathset -q -d):$PATH"
 ```
 
 Or pin to a specific config:
 
 ```sh
-export PATH="$(pathmgr -c "$HOME/dotfiles/path" -q)"
+export PATH="$(pathset -c "$HOME/dotfiles/path" -q -d)"
 ```
 
 ### Fish shell
 
-`pathmgr` emits a colon-joined string, but fish wants `PATH` as a list. Split
+`pathset` emits a colon-joined string, but fish wants `PATH` as a list. Split
 on `:` in your `~/.config/fish/config.fish`:
 
 ```fish
-set -gx PATH (pathmgr -q | string split :)
+set -gx PATH (pathset -q -d | string split :)
 ```
 
 Or to compose with the existing fish path:
 
 ```fish
-set -gx PATH (pathmgr -q | string split :) $PATH
+set -gx PATH (pathset -q -d | string split :) $PATH
 ```
 
 ## Development
 
 ```sh
-make build     # compile
-make lint      # syntax-only check
-make test      # run smoke tests in tests/run.sh
-make clean     # remove build artifacts
-make release   # -O3 build
-make install   # install to $(PREFIX)/bin (default /usr/local)
-make uninstall # remove the installed binary and man page
+make build             # compile (native arch)
+make lint              # syntax-only check
+make test              # run smoke tests in tests/run.sh
+make clean             # remove build artifacts
+make release           # -O3 build (native arch)
+make universal         # macOS fat binary (arm64 + x86_64)
+make release-universal # -O3 macOS fat binary
+make install           # install to $(PREFIX)/bin (default /usr/local)
+make uninstall         # remove the installed binary and man page
 ```
 
-The implementation is a single C99 source file (`pathmgr.c`) with no
+The implementation is a single C99 source file (`pathset.c`) with no
 dependencies beyond libc.
 
 ## Changes
@@ -300,7 +325,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 - Comments are full-line only. Inline `# ...` is not stripped (paths may
   legitimately contain `#`).
 - Path entries containing literal `"` are not escaped.
-- `pathmgr` does not deduplicate entries by default; pass `-d` to dedup.
+- `pathset` does not deduplicate entries by default; pass `-d` to dedup.
 - Directories that don't exist or are empty are silently dropped (with a
   stderr warning unless `-q` is given). Permission errors on a path are
   treated the same way.

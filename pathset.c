@@ -11,10 +11,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static const char *PROG = "pathmgr";
+static const char *PROG = "pathset";
 
-#ifndef PATHMGR_VERSION
-#define PATHMGR_VERSION "unknown"
+#ifndef PATHSET_VERSION
+#define PATHSET_VERSION "unknown"
 #endif
 
 static void die(int code, const char *fmt, ...) {
@@ -33,8 +33,8 @@ static void usage(FILE *out) {
 		"\n"
 		"Reads a list of directories from a config file and prints a ':'-joined\n"
 		"path string to stdout. Compose into any variable with $(...):\n"
-		"  export PATH=\"$(%s -q)\"\n"
-		"  export PATH=\"$(%s -q):$PATH\"      # prepend\n"
+		"  export PATH=\"$(%s -q -d)\"\n"
+		"  export PATH=\"$(%s -q -d):$PATH\"   # prepend\n"
 		"\n"
 		"Options:\n"
 		"  -c CONFIG  read config from CONFIG (overrides default lookup)\n"
@@ -62,14 +62,14 @@ static void usage(FILE *out) {
 		"\n"
 		"Config lookup (first match wins):\n"
 		"  1. -c CONFIG (no fallback if missing — fatal error)\n"
-		"  2. $XDG_CONFIG_HOME/pathmgr/config (only if XDG_CONFIG_HOME is set)\n"
-		"  3. $HOME/.config/pathmgr/config    (XDG default — canonical)\n"
-		"  4. $HOME/.pathmgr/config           (legacy home location)\n"
-		"  5. $HOME/.pathmgr                  (single-file fallback)\n"
+		"  2. $XDG_CONFIG_HOME/pathset/config (only if XDG_CONFIG_HOME is set)\n"
+		"  3. $HOME/.config/pathset/config    (XDG default — canonical)\n"
+		"  4. $HOME/.pathset/config           (legacy home location)\n"
+		"  5. $HOME/.pathset                  (single-file fallback)\n"
 		"\n"
 		"Shell setup (add to your shell rc):\n"
-		"  zsh / bash:  export PATH=\"$(%s -q)\"\n"
-		"  fish:        set -gx PATH (%s -q | string split :)\n"
+		"  zsh / bash:  export PATH=\"$(%s -q -d)\"\n"
+		"  fish:        set -gx PATH (%s -q -d | string split :)\n"
 		"\n"
 		"Exit codes:\n"
 		"  0  every config entry was emitted\n"
@@ -100,10 +100,10 @@ static char *join2(const char *a, const char *b) {
 /*
  * Lookup order (first match wins):
  *   1. -c CONFIG                          (no fallback if missing)
- *   2. $XDG_CONFIG_HOME/pathmgr/config    (only if XDG_CONFIG_HOME is set)
- *   3. $HOME/.config/pathmgr/config       (XDG spec default — canonical)
- *   4. $HOME/.pathmgr/config              (legacy home location)
- *   5. $HOME/.pathmgr                     (single-file fallback)
+ *   2. $XDG_CONFIG_HOME/pathset/config    (only if XDG_CONFIG_HOME is set)
+ *   3. $HOME/.config/pathset/config       (XDG spec default — canonical)
+ *   4. $HOME/.pathset/config              (legacy home location)
+ *   5. $HOME/.pathset                     (single-file fallback)
  *
  * Steps 3-5 use access(F_OK) to decide which exists. If none do, step 3's
  * canonical path is returned so the "cannot open" error names the location
@@ -113,18 +113,18 @@ static char *resolve_config_path(const char *override) {
 	if (override) return xstrdup(override);
 
 	const char *xdg = getenv("XDG_CONFIG_HOME");
-	if (xdg && *xdg) return join2(xdg, "/pathmgr/config");
+	if (xdg && *xdg) return join2(xdg, "/pathset/config");
 
 	const char *home = getenv("HOME");
 	if (home && *home) {
-		char *xdg_default = join2(home, "/.config/pathmgr/config");
+		char *xdg_default = join2(home, "/.config/pathset/config");
 		if (access(xdg_default, F_OK) == 0) return xdg_default;
-		char *legacy_dir = join2(home, "/.pathmgr/config");
+		char *legacy_dir = join2(home, "/.pathset/config");
 		if (access(legacy_dir, F_OK) == 0) {
 			free(xdg_default);
 			return legacy_dir;
 		}
-		char *single = join2(home, "/.pathmgr");
+		char *single = join2(home, "/.pathset");
 		if (access(single, F_OK) == 0) {
 			free(xdg_default);
 			free(legacy_dir);
@@ -480,7 +480,7 @@ int main(int argc, char **argv) {
 		case 'd': dedup = 1; break;
 		case 'q': quiet = 1; break;
 		case 'v': verbose = 1; break;
-		case 'V': printf("%s %s\n", PROG, PATHMGR_VERSION); return 0;
+		case 'V': printf("%s %s\n", PROG, PATHSET_VERSION); return 0;
 		case 'h': usage(stdout); return 0;
 		case ':':
 			usage(stderr);
