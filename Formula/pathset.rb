@@ -18,8 +18,8 @@
 class Pathset < Formula
   desc "Tiny C utility that turns a directory list into a PATH value"
   homepage "https://github.com/grazij/pathset"
-  url "https://github.com/grazij/pathset/archive/refs/tags/v0.2.0.tar.gz"
-  sha256 "9716d8b16a92badd743d09370f36b1ad1facd9cc40a0661b832bdd231eb8df32"
+  url "https://github.com/grazij/pathset/archive/refs/tags/v0.3.0.tar.gz"
+  sha256 "c175090d6b9130921a5bacb79c6ae934966fa467f65619f98020cb56b955b753"
   license "MIT"
   head "https://github.com/grazij/pathset.git", branch: "main"
 
