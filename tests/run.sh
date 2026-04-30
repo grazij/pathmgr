@@ -84,10 +84,10 @@ fi
 # --- Test 5: XDG_CONFIG_HOME fallback (no -c) ---
 xdg="$WORK/xdg"
 mkdir -p "$xdg/pathset"
-echo "$A" >"$xdg/pathset/config"
+echo "$A" >"$xdg/pathset/path"
 got5="$(env -i HOME="$WORK/home" XDG_CONFIG_HOME="$xdg" "$BIN" 2>/dev/null)"
 if [[ "$got5" == "$A" ]]; then
-	ok "XDG_CONFIG_HOME/pathset/config fallback"
+	ok "XDG_CONFIG_HOME/pathset/path fallback"
 else
 	bad "XDG fallback" "got: $got5"
 fi
@@ -95,10 +95,10 @@ fi
 # --- Test 6: HOME fallback when XDG_CONFIG_HOME unset ---
 home="$WORK/home"
 mkdir -p "$home/.pathset"
-echo "$B" >"$home/.pathset/config"
+echo "$B" >"$home/.pathset/path"
 got6="$(env -i HOME="$home" "$BIN" 2>/dev/null)"
 if [[ "$got6" == "$B" ]]; then
-	ok "HOME/.pathset/config fallback"
+	ok "HOME/.pathset/path fallback"
 else
 	bad "HOME fallback" "got: $got6"
 fi
@@ -566,65 +566,122 @@ fi
 # Restore perms so subsequent tests / rm -rf work.
 chmod 755 "$noperm"
 
-# --- Test 44: $HOME/.pathset (single-file) fallback ---
-home44="$WORK/home44"
-mkdir -p "$home44"
-echo "$A" >"$home44/.pathset"
-got44="$(env -i HOME="$home44" "$BIN" 2>/dev/null)"
-if [[ "$got44" == "$A" ]]; then
-	ok "\$HOME/.pathset (single-file) fallback"
-else
-	bad "single-file fallback" "got: $got44"
-fi
-
-# --- Test 45: $HOME/.pathset/config takes precedence over $HOME/.pathset ---
-home45="$WORK/home45"
-mkdir -p "$home45/.pathset"
-echo "$A" >"$home45/.pathset/config"
-# A real ~/.pathset can't be both file and dir, but the parent path
-# `$home45/.pathset` IS the dir here. To prove dir-form wins, we use a
-# separate dir layout where the file would conflict; instead, simulate
-# precedence by checking that when both are reachable as separate paths,
-# the dir-form is selected.
-got45="$(env -i HOME="$home45" "$BIN" 2>/dev/null)"
-if [[ "$got45" == "$A" ]]; then
-	ok "\$HOME/.pathset/config preferred when present"
-else
-	bad "config-dir precedence" "got: $got45"
-fi
-
-# --- Test 46: missing all forms -> error mentions canonical XDG-default path ---
+# --- Test 44: missing all forms -> error mentions canonical XDG-default path ---
 home46="$WORK/home46"
 mkdir -p "$home46"
 env -i HOME="$home46" "$BIN" >/dev/null 2>"$WORK/err46"
 rc=$?
-if [[ $rc -ne 0 ]] && grep -q "$home46/.config/pathset/config" "$WORK/err46"; then
+if [[ $rc -ne 0 ]] && grep -q "$home46/.config/pathset/path" "$WORK/err46"; then
 	ok "missing config error names canonical XDG-default path"
 else
 	bad "missing canonical err" "rc=$rc / err: $(cat "$WORK/err46")"
 fi
 
-# --- Test 47: $HOME/.config/pathset/config (XDG default) found ---
+# --- Test 45: $HOME/.config/pathset/path (XDG default) found ---
 home47="$WORK/home47"
 mkdir -p "$home47/.config/pathset"
-echo "$A" >"$home47/.config/pathset/config"
+echo "$A" >"$home47/.config/pathset/path"
 got47="$(env -i HOME="$home47" "$BIN" 2>/dev/null)"
 if [[ "$got47" == "$A" ]]; then
-	ok "\$HOME/.config/pathset/config (XDG default) found"
+	ok "\$HOME/.config/pathset/path (XDG default) found"
 else
 	bad "XDG default" "got: $got47"
 fi
 
-# --- Test 48: XDG default precedes legacy ~/.pathset/config ---
+# --- Test 46: XDG default precedes legacy ~/.pathset/path ---
 home48="$WORK/home48"
 mkdir -p "$home48/.config/pathset" "$home48/.pathset"
-echo "$A" >"$home48/.config/pathset/config"
-echo "$B" >"$home48/.pathset/config"
+echo "$A" >"$home48/.config/pathset/path"
+echo "$B" >"$home48/.pathset/path"
 got48="$(env -i HOME="$home48" "$BIN" 2>/dev/null)"
 if [[ "$got48" == "$A" ]]; then
-	ok "XDG default precedes legacy ~/.pathset/config"
+	ok "XDG default precedes legacy ~/.pathset/path"
 else
 	bad "XDG precedence over legacy" "got: $got48"
+fi
+
+# --- Test 47: -k man reads ~/.config/pathset/man ---
+home_man="$WORK/home_man"
+mkdir -p "$home_man/.config/pathset"
+echo "$A" >"$home_man/.config/pathset/man"
+got_man="$(env -i HOME="$home_man" "$BIN" -k man 2>/dev/null)"
+if [[ "$got_man" == "$A" ]]; then
+	ok "-k man reads ~/.config/pathset/man"
+else
+	bad "-k man" "got: $got_man"
+fi
+
+# --- Test 48: -k info reads ~/.config/pathset/info ---
+home_info="$WORK/home_info"
+mkdir -p "$home_info/.config/pathset"
+echo "$B" >"$home_info/.config/pathset/info"
+got_info="$(env -i HOME="$home_info" "$BIN" -k info 2>/dev/null)"
+if [[ "$got_info" == "$B" ]]; then
+	ok "-k info reads ~/.config/pathset/info"
+else
+	bad "-k info" "got: $got_info"
+fi
+
+# --- Test 49: -k fpath reads ~/.config/pathset/fpath ---
+home_fp="$WORK/home_fp"
+mkdir -p "$home_fp/.config/pathset"
+echo "$C" >"$home_fp/.config/pathset/fpath"
+got_fp="$(env -i HOME="$home_fp" "$BIN" -k fpath 2>/dev/null)"
+if [[ "$got_fp" == "$C" ]]; then
+	ok "-k fpath reads ~/.config/pathset/fpath"
+else
+	bad "-k fpath" "got: $got_fp"
+fi
+
+# --- Test 50: -k path is equivalent to no -k ---
+home_p="$WORK/home_p"
+mkdir -p "$home_p/.config/pathset"
+echo "$A" >"$home_p/.config/pathset/path"
+got_default="$(env -i HOME="$home_p" "$BIN" 2>/dev/null)"
+got_kpath="$(env -i HOME="$home_p" "$BIN" -k path 2>/dev/null)"
+if [[ "$got_default" == "$A" ]] && [[ "$got_default" == "$got_kpath" ]]; then
+	ok "-k path equivalent to default (no -k)"
+else
+	bad "-k path default" "default: $got_default / -k path: $got_kpath"
+fi
+
+# --- Test 51: -k bogus exits 2 with error ---
+"$BIN" -k bogus >/dev/null 2>"$WORK/err_kbogus"
+rc=$?
+if [[ $rc -eq 2 ]] && grep -q "invalid kind 'bogus'" "$WORK/err_kbogus"; then
+	ok "-k bogus exits 2 with error"
+else
+	bad "-k bogus" "rc=$rc / err: $(cat "$WORK/err_kbogus")"
+fi
+
+# --- Test 52: -k with no argument exits 2 ---
+"$BIN" -k >/dev/null 2>"$WORK/err_knoarg"
+rc=$?
+if [[ $rc -eq 2 ]]; then
+	ok "-k with no arg exits 2"
+else
+	bad "-k no arg" "rc=$rc"
+fi
+
+# --- Test 53: -c CONFIG -k man reads CONFIG (kind ignored when -c given) ---
+cfg_cwk="$WORK/cfg_cwk"
+echo "$A" >"$cfg_cwk"
+got_cwk="$("$BIN" -c "$cfg_cwk" -k man 2>/dev/null)"
+if [[ "$got_cwk" == "$A" ]]; then
+	ok "-c overrides -k (kind ignored)"
+else
+	bad "-c + -k" "got: $got_cwk"
+fi
+
+# --- Test 54: legacy ~/.pathset/<kind> fallback works for non-default kind ---
+home_legacy_man="$WORK/home_legacy_man"
+mkdir -p "$home_legacy_man/.pathset"
+echo "$A" >"$home_legacy_man/.pathset/man"
+got_legacy_man="$(env -i HOME="$home_legacy_man" "$BIN" -k man 2>/dev/null)"
+if [[ "$got_legacy_man" == "$A" ]]; then
+	ok "legacy ~/.pathset/<kind> works for non-default kind"
+else
+	bad "legacy man" "got: $got_legacy_man"
 fi
 
 # --- Summary ---

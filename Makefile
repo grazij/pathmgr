@@ -1,5 +1,5 @@
 BINARY = pathset
-VERSION ?= 0.2.0
+VERSION ?= 0.3.0
 PREFIX ?= /usr/local
 CC ?= cc
 CFLAGS ?= -O2 -Wall -Wextra -Wpedantic -std=c99
@@ -84,7 +84,7 @@ man: build
 		./$(BINARY) -o $(BINARY).1
 
 run: build
-	-./$(BINARY) -c examples/config.example
+	-./$(BINARY) -c examples/path.example
 
 lint:
 	$(CC) $(CFLAGS) -fsyntax-only pathset.c

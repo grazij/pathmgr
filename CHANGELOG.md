@@ -6,6 +6,35 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `-k KIND` flag selects which config to read. Valid kinds: `path`
+  (default), `man`, `info`, `fpath`. The output format is unchanged
+  (still a `:`-joined string) — the kind only chooses which file is
+  read, so users can compose the result into `PATH`, `MANPATH`,
+  `INFOPATH`, or zsh's `fpath` array.
+- New starter examples: `examples/man.example` and
+  `examples/fpath.example`.
+
+### Changed (breaking)
+
+- The canonical config filename is now `<kind>` (e.g. `path`, `man`)
+  instead of `config`. Lookup paths become:
+  1. `-c CONFIG`
+  2. `$XDG_CONFIG_HOME/pathset/<kind>`
+  3. `$HOME/.config/pathset/<kind>` (canonical)
+  4. `$HOME/.pathset/<kind>`
+
+  Existing users must rename their config:
+  `mv ~/.config/pathset/config ~/.config/pathset/path`.
+- The `$HOME/.pathset` single-file fallback is removed — it doesn't
+  fit the multi-kind layout. Move to `~/.config/pathset/path` if you
+  were using it.
+- Invalid `-k` values (anything outside `{path, man, info, fpath}`)
+  exit `2`. When both `-c` and `-k` are given, `-c` wins and `-k` is
+  silently ignored (kind only affects the default lookup).
+- Renamed `examples/config.example` → `examples/path.example`.
+
 ## 0.2.0
 
 ### Changed (breaking)

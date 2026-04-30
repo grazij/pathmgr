@@ -1,8 +1,9 @@
 # pathset
 
 A tiny C utility that turns a human-readable list of directories into a
-`PATH` value. Keep your shell `PATH` in one config file instead of letting
-fragments pile up across rc files.
+`:`-joined string suitable for `PATH`, `MANPATH`, `INFOPATH`, or zsh's
+`fpath`. Keep each one in its own config file instead of letting fragments
+pile up across rc files.
 
 ## Why
 
@@ -22,9 +23,13 @@ sees is whatever `path_helper` produced unless you overwrite it in
 `~/.zshenv`.
 
 `pathset` fixes both: declare the order you want once in
-`~/.config/pathset/config`, set `PATH="$(pathset -q -d)"` in `~/.zshenv`,
+`~/.config/pathset/path`, set `PATH="$(pathset -q -d)"` in `~/.zshenv`,
 and that's the order you actually get — in shells *and* in Shortcuts.
 Empty / non-existent dirs are dropped so the final value stays clean.
+
+The same machinery works for the other shell path-like variables — point
+`pathset` at `~/.config/pathset/man`, `info`, or `fpath` with `-k KIND`
+to manage `MANPATH`, `INFOPATH`, or zsh's `fpath` the same way.
 
 ## Quickstart
 
@@ -34,16 +39,26 @@ make && sudo make install
 
 # 2. Write a config — copy the example and edit
 mkdir -p ~/.config/pathset
-cp examples/config.example ~/.config/pathset/config
-$EDITOR ~/.config/pathset/config
+cp examples/path.example ~/.config/pathset/path
+$EDITOR ~/.config/pathset/path
 
 # 3. Add to ~/.zshrc (or ~/.bashrc / ~/.profile)
 export PATH="$(pathset -q -d)"
 ```
 
 That's it. New shells will pick up the managed PATH. Edit
-`~/.config/pathset/config` whenever you want to add or remove an entry;
+`~/.config/pathset/path` whenever you want to add or remove an entry;
 the next shell startup applies the change.
+
+To also manage `MANPATH`, `INFOPATH`, or zsh `fpath`, drop config files
+at `~/.config/pathset/man`, `~/.config/pathset/info`, or
+`~/.config/pathset/fpath` and select the kind with `-k`:
+
+```sh
+export MANPATH="$(pathset -k man -q -d)"
+export INFOPATH="$(pathset -k info -q -d)"
+fpath=( ${(s.:.)$(pathset -k fpath -q -d)} $fpath )   # zsh array
+```
 
 ## Installation
 
@@ -88,6 +103,20 @@ useful when packaging a prebuilt release artifact. Verify with:
 lipo -info pathset
 ```
 
+## Migrating from earlier pathset versions
+
+Before multi-kind support, the canonical config filename was
+`~/.config/pathset/config`. The new layout uses one file per kind under
+`~/.config/pathset/`. Existing users should rename their config:
+
+```sh
+mv ~/.config/pathset/config ~/.config/pathset/path
+# also: mv ~/.pathset/config ~/.pathset/path  (if you use the legacy location)
+```
+
+The bare-file fallback (`~/.pathset` with no extension) is no longer
+recognized — move it to `~/.config/pathset/path` if you were using it.
+
 ## Migrating from your current PATH
 
 If you already have a `PATH` you're happy with and just want to take it
@@ -95,10 +124,10 @@ under management, seed your config from the live value:
 
 ```sh
 mkdir -p ~/.config/pathset
-echo "$PATH" | tr ':' '\n' > ~/.config/pathset/config
+echo "$PATH" | tr ':' '\n' > ~/.config/pathset/path
 ```
 
-Then open `~/.config/pathset/config` in your editor and clean it up:
+Then open `~/.config/pathset/path` in your editor and clean it up:
 
 1. **Add comments** with `#` to group related entries (e.g. `# homebrew`,
    `# language toolchains`, `# system`). Future-you will thank you.
@@ -135,9 +164,13 @@ work.
 first non-whitespace character is `#` are treated as comments. Blank lines are
 ignored.
 
-A starter config is in
-[`examples/config.example`](examples/config.example) — copy it to
-`~/.config/pathset/config` and edit. Excerpt:
+Starter configs live in [`examples/`](examples/):
+
+- [`path.example`](examples/path.example) — copy to `~/.config/pathset/path`
+- [`man.example`](examples/man.example) — copy to `~/.config/pathset/man`
+- [`fpath.example`](examples/fpath.example) — copy to `~/.config/pathset/fpath`
+
+Excerpt from `path.example`:
 
 ```
 ~/bin
@@ -224,26 +257,40 @@ if you hit one):
 - Empty (set to `""`) variables expand to the empty string. The resulting
   path will usually fail the directory-exists check and get skipped.
 
-### Config lookup order
+### Kinds and config lookup order
 
-`pathset` resolves the config path in this order — **first match wins**:
+`pathset` supports four config kinds, selected with `-k KIND`:
 
-1. `-c CONFIG` on the command line (no fallback if missing — fatal error)
-2. `$XDG_CONFIG_HOME/pathset/config` (only if `XDG_CONFIG_HOME` is set)
-3. `$HOME/.config/pathset/config` (XDG default — **canonical**)
-4. `$HOME/.pathset/config` (legacy home location)
-5. `$HOME/.pathset` (single-file fallback for users who prefer a dotfile)
+| `-k` value | Reads | Compose into |
+| --- | --- | --- |
+| `path` (default) | `~/.config/pathset/path` | `PATH` |
+| `man` | `~/.config/pathset/man` | `MANPATH` |
+| `info` | `~/.config/pathset/info` | `INFOPATH` |
+| `fpath` | `~/.config/pathset/fpath` | zsh `fpath` array |
 
-Steps 3-5 use `access(F_OK)` to decide which exists. If none do, the
+Invalid kind values exit `2`. The output format is the same `:`-joined
+string for every kind — what changes is which file is read.
+
+For each kind, `pathset` resolves the config path in this order — **first
+match wins** (`<kind>` is the value of `-k`, default `path`):
+
+1. `-c CONFIG` on the command line (no fallback if missing — fatal error;
+   when `-c` is given, `-k` is ignored)
+2. `$XDG_CONFIG_HOME/pathset/<kind>` (only if `XDG_CONFIG_HOME` is set)
+3. `$HOME/.config/pathset/<kind>` (XDG default — **canonical**)
+4. `$HOME/.pathset/<kind>` (legacy home location)
+
+Steps 3-4 use `access(F_OK)` to decide which exists. If neither does, the
 error message points at the canonical step-3 path.
 
 ## Usage
 
 ```
-pathset [-c CONFIG] [-d] [-q] [-v] [-V] [-h]
+pathset [-c CONFIG] [-k KIND] [-d] [-q] [-v] [-V] [-h]
 ```
 
-Pass `-V` to print the version and exit.
+Pass `-k KIND` to select which config to read — one of `path` (default),
+`man`, `info`, `fpath`. Pass `-V` to print the version and exit.
 
 Directories that don't exist or are empty are skipped, with a warning printed
 to stderr. Pass `-q` to suppress those warnings.
@@ -299,6 +346,28 @@ Or to compose with the existing fish path:
 ```fish
 set -gx PATH (pathset -q -d | string split :) $PATH
 ```
+
+### MANPATH, INFOPATH, fpath
+
+The same machinery manages other shell path-like variables. Drop a config
+file at `~/.config/pathset/<kind>` and select the kind with `-k`:
+
+```sh
+# zsh / bash
+export MANPATH="$(pathset -k man -q -d)"
+export INFOPATH="$(pathset -k info -q -d)"
+
+# zsh — fpath is an array, so split the colon-joined output back into elements
+fpath=( ${(s.:.)$(pathset -k fpath -q -d)} $fpath )
+```
+
+```fish
+set -gx MANPATH (pathset -k man -q -d | string split :)
+set -gx INFOPATH (pathset -k info -q -d | string split :)
+```
+
+The output format and exit-code semantics are identical for every kind —
+only the file that's read changes.
 
 ## Development
 

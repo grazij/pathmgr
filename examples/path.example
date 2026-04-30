@@ -1,10 +1,9 @@
-# Example pathset config.
+# Example pathset config for PATH (kind = path, the default).
 #
 # Copy to one of these locations (first match wins, see `pathset -h`):
-#   ~/.config/pathset/config       (XDG default — canonical)
-#   ~/.pathset/config              (legacy home location)
-#   ~/.pathset                     (single-file fallback)
-#   $XDG_CONFIG_HOME/pathset/config (if XDG_CONFIG_HOME is set explicitly)
+#   ~/.config/pathset/path        (XDG default — canonical)
+#   ~/.pathset/path               (legacy home location)
+#   $XDG_CONFIG_HOME/pathset/path (if XDG_CONFIG_HOME is set explicitly)
 #
 # Then add to your shell rc:
 #   zsh/bash:  export PATH="$(pathset -q -d)"

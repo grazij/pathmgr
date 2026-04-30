@@ -17,6 +17,21 @@ static const char *PROG = "pathset";
 #define PATHSET_VERSION "unknown"
 #endif
 
+/* Single source of truth for the supported config kinds. The kind selects
+ * which filename is read under `pathset/`. The output format is the same
+ * `:`-joined string for every kind — users compose it into the right shell
+ * variable themselves (PATH, MANPATH, INFOPATH, fpath). */
+static const char *KINDS[] = {"path", "man", "info", "fpath"};
+static const size_t NUM_KINDS = sizeof(KINDS) / sizeof(KINDS[0]);
+#define DEFAULT_KIND "path"
+
+static int is_valid_kind(const char *k) {
+	for (size_t i = 0; i < NUM_KINDS; i++) {
+		if (strcmp(KINDS[i], k) == 0) return 1;
+	}
+	return 0;
+}
+
 static void die(int code, const char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
@@ -29,15 +44,18 @@ static void die(int code, const char *fmt, ...) {
 
 static void usage(FILE *out) {
 	fprintf(out,
-		"Usage: %s [-c CONFIG] [-d] [-q] [-v] [-V] [-h]\n"
+		"Usage: %s [-c CONFIG] [-k KIND] [-d] [-q] [-v] [-V] [-h]\n"
 		"\n"
 		"Reads a list of directories from a config file and prints a ':'-joined\n"
-		"path string to stdout. Compose into any variable with $(...):\n"
+		"string to stdout. Compose into any variable with $(...):\n"
 		"  export PATH=\"$(%s -q -d)\"\n"
-		"  export PATH=\"$(%s -q -d):$PATH\"   # prepend\n"
+		"  export MANPATH=\"$(%s -k man -q -d)\"\n"
+		"  export INFOPATH=\"$(%s -k info -q -d)\"\n"
+		"  fpath=( ${(s.:.)$(%s -k fpath -q -d)} )   # zsh array\n"
 		"\n"
 		"Options:\n"
 		"  -c CONFIG  read config from CONFIG (overrides default lookup)\n"
+		"  -k KIND    select kind: path (default), man, info, fpath\n"
 		"  -d         drop duplicate entries (first occurrence wins)\n"
 		"  -q         suppress skip warnings on stderr\n"
 		"  -v         print kept entries and expansions on stderr (-q wins)\n"
@@ -60,12 +78,11 @@ static void usage(FILE *out) {
 		"  ${VAR}/foo   braced form, useful next to a name char\n"
 		"  Not supported: mid-string '~', ${VAR:-default}, '\\$' escapes.\n"
 		"\n"
-		"Config lookup (first match wins):\n"
+		"Config lookup (first match wins; <kind> = path|man|info|fpath):\n"
 		"  1. -c CONFIG (no fallback if missing — fatal error)\n"
-		"  2. $XDG_CONFIG_HOME/pathset/config (only if XDG_CONFIG_HOME is set)\n"
-		"  3. $HOME/.config/pathset/config    (XDG default — canonical)\n"
-		"  4. $HOME/.pathset/config           (legacy home location)\n"
-		"  5. $HOME/.pathset                  (single-file fallback)\n"
+		"  2. $XDG_CONFIG_HOME/pathset/<kind> (only if XDG_CONFIG_HOME is set)\n"
+		"  3. $HOME/.config/pathset/<kind>    (XDG default — canonical)\n"
+		"  4. $HOME/.pathset/<kind>           (legacy home location)\n"
 		"\n"
 		"Shell setup (add to your shell rc):\n"
 		"  zsh / bash:  export PATH=\"$(%s -q -d)\"\n"
@@ -77,7 +94,7 @@ static void usage(FILE *out) {
 		"  2  bad command-line argument\n"
 		"  3  one or more entries were skipped (expand or filter failure;\n"
 		"     '?optional' skips and dedup drops do NOT contribute)\n",
-		PROG, PROG, PROG, PROG, PROG);
+		PROG, PROG, PROG, PROG, PROG, PROG, PROG);
 }
 
 static char *xstrdup(const char *s) {
@@ -88,50 +105,47 @@ static char *xstrdup(const char *s) {
 	return p;
 }
 
-static char *join2(const char *a, const char *b) {
-	size_t la = strlen(a), lb = strlen(b);
-	char *p = malloc(la + lb + 1);
+/* Builds "<prefix>/<segment>/<kind>" — used by resolve_config_path. */
+static char *join3(const char *prefix, const char *segment, const char *kind) {
+	size_t lp = strlen(prefix), ls = strlen(segment), lk = strlen(kind);
+	/* +2 for two '/' separators, +1 for terminator */
+	char *p = malloc(lp + 1 + ls + 1 + lk + 1);
 	if (!p) die(1, "out of memory");
-	memcpy(p, a, la);
-	memcpy(p + la, b, lb + 1);
+	memcpy(p, prefix, lp);
+	p[lp] = '/';
+	memcpy(p + lp + 1, segment, ls);
+	p[lp + 1 + ls] = '/';
+	memcpy(p + lp + 1 + ls + 1, kind, lk + 1);
 	return p;
 }
 
 /*
- * Lookup order (first match wins):
+ * Lookup order (first match wins; <kind> is the value of -k, default "path"):
  *   1. -c CONFIG                          (no fallback if missing)
- *   2. $XDG_CONFIG_HOME/pathset/config    (only if XDG_CONFIG_HOME is set)
- *   3. $HOME/.config/pathset/config       (XDG spec default — canonical)
- *   4. $HOME/.pathset/config              (legacy home location)
- *   5. $HOME/.pathset                     (single-file fallback)
+ *   2. $XDG_CONFIG_HOME/pathset/<kind>    (only if XDG_CONFIG_HOME is set)
+ *   3. $HOME/.config/pathset/<kind>       (XDG spec default — canonical)
+ *   4. $HOME/.pathset/<kind>              (legacy home location)
  *
- * Steps 3-5 use access(F_OK) to decide which exists. If none do, step 3's
+ * Steps 3-4 use access(F_OK) to decide which exists. If none do, step 3's
  * canonical path is returned so the "cannot open" error names the location
  * the README recommends.
  */
-static char *resolve_config_path(const char *override) {
+static char *resolve_config_path(const char *override, const char *kind) {
 	if (override) return xstrdup(override);
 
 	const char *xdg = getenv("XDG_CONFIG_HOME");
-	if (xdg && *xdg) return join2(xdg, "/pathset/config");
+	if (xdg && *xdg) return join3(xdg, "pathset", kind);
 
 	const char *home = getenv("HOME");
 	if (home && *home) {
-		char *xdg_default = join2(home, "/.config/pathset/config");
+		char *xdg_default = join3(home, ".config/pathset", kind);
 		if (access(xdg_default, F_OK) == 0) return xdg_default;
-		char *legacy_dir = join2(home, "/.pathset/config");
+		char *legacy_dir = join3(home, ".pathset", kind);
 		if (access(legacy_dir, F_OK) == 0) {
 			free(xdg_default);
 			return legacy_dir;
 		}
-		char *single = join2(home, "/.pathset");
-		if (access(single, F_OK) == 0) {
-			free(xdg_default);
-			free(legacy_dir);
-			return single;
-		}
 		free(legacy_dir);
-		free(single);
 		return xdg_default;
 	}
 
@@ -466,6 +480,7 @@ static void filter_paths(Vec *v, int quiet, int verbose, int *skipped) {
 
 int main(int argc, char **argv) {
 	const char *cfg_override = NULL;
+	const char *kind = DEFAULT_KIND;
 	int quiet = 0;
 	int dedup = 0;
 	int verbose = 0;
@@ -474,9 +489,16 @@ int main(int argc, char **argv) {
 	 * and the message format. */
 	opterr = 0;
 	int opt;
-	while ((opt = getopt(argc, argv, ":c:dqvVh")) != -1) {
+	while ((opt = getopt(argc, argv, ":c:k:dqvVh")) != -1) {
 		switch (opt) {
 		case 'c': cfg_override = optarg; break;
+		case 'k':
+			if (!is_valid_kind(optarg)) {
+				usage(stderr);
+				die(2, "invalid kind '%s' (expected: path, man, info, fpath)", optarg);
+			}
+			kind = optarg;
+			break;
 		case 'd': dedup = 1; break;
 		case 'q': quiet = 1; break;
 		case 'v': verbose = 1; break;
@@ -499,7 +521,7 @@ int main(int argc, char **argv) {
 	/* -q wins if both are given: silence everything on stderr. */
 	if (quiet) verbose = 0;
 
-	char *cfg = resolve_config_path(cfg_override);
+	char *cfg = resolve_config_path(cfg_override, kind);
 	Vec v = {0};
 	int skipped = 0;
 	read_paths(cfg, &v);
