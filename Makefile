@@ -1,5 +1,5 @@
 BINARY = pathset
-VERSION ?= 0.3.0
+VERSION ?= 0.3.1
 PREFIX ?= /usr/local
 CC ?= cc
 CFLAGS ?= -O2 -Wall -Wextra -Wpedantic -std=c99

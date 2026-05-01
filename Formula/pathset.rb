@@ -23,9 +23,12 @@ class Pathset < Formula
   license "MIT"
   head "https://github.com/grazij/pathset.git", branch: "main"
 
+  depends_on "help2man" => :build
+
   def install
-    system "make", "build", "VERSION=#{version}"
+    system "make", "release", "VERSION=#{version}"
     bin.install "pathset"
+    man1.install "pathset.1"
     pkgshare.install "examples"
   end
 
